@@ -43,6 +43,8 @@ int main (int argc, char *argv[]){
   int BUF_SIZE = 255;
   int verbose;
 
+  char hash_md5[32];
+
   dictionary = malloc(1*sizeof(char));
   hash = malloc(1*sizeof(char));
   output = malloc(1*sizeof(char));
@@ -84,18 +86,20 @@ int main (int argc, char *argv[]){
       exit(1);
   }
 
+  printf("\nAnalizing file...\n");
   int number_of_words = file_nlines(dictionary_file);
 
-  char word[BUF_SIZE], word_cpy[BUF_SIZE];
+  char word[BUF_SIZE], word_cpy[BUF_SIZE], word_md5[32];
 
   if(fseek(dictionary_file, 0, SEEK_SET)==-1){
     exit(1);
   }
 
   int j, found=0;
-
+  double execution_time_start = omp_get_wtime();
   // Assign one word for each thread
-  #pragma omp parallel for private (word, word_cpy) shared(found) schedule(dynamic)
+  printf("\nSearching...\n");
+  #pragma omp parallel for private (word, word_cpy, word_md5, hash_md5) shared(found) schedule(dynamic)
   for(j=0;j<number_of_words;j++){
     if(fgets(word,BUF_SIZE,dictionary_file)!= NULL){
       if(found){
@@ -108,14 +112,16 @@ int main (int argc, char *argv[]){
       if(verbose){
         printf("Thread: %d - Trying: %s\n", omp_get_thread_num(), word_cpy);
       }
-      char word_md5[32];
-      MD5_HashString(word_cpy,&word_md5[0]);
 
+      MD5_HashString(word_cpy,word_md5);
+
+      hash[32]='\0';
       if(strcmp(hash, word_md5)==0){
         if(verbose){
           printf("Thread: %d - Found: %s\n", omp_get_thread_num(), word_cpy);
         }else{
           printf("Password Found: %s\n\n", word_cpy);
+          printf("Search Execution time: %f seconds\n\n", omp_get_wtime() - execution_time_start);
         }
         found=1;
       }
@@ -127,6 +133,7 @@ int main (int argc, char *argv[]){
 
   if(!found){
     printf("Password not found.\n\n");
+    printf("Search Execution time: %f seconds\n\n", omp_get_wtime() - execution_time_start);
   }
 
   exit(0);
